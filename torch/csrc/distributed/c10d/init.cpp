@@ -32,6 +32,7 @@
 
 #include <fmt/format.h>
 #include <pybind11/chrono.h>
+#include <pybind11/embed.h>
 #include <torch/csrc/distributed/c10d/PrefixStore.hpp>
 
 #include <torch/csrc/distributed/c10d/comm.hpp>
@@ -1692,6 +1693,23 @@ Arguments:
                 return self->getBackend(device.type());
               },
               py::arg("device"),
+              py::call_guard<py::gil_scoped_release>())
+          .def(
+              "_register_on_completion_hook",
+              [](const c10::intrusive_ptr<::c10d::ProcessGroup>& self,
+                 py::object hook) {
+                //py::scoped_interpreter g;
+                self->registerOnCompletionHook([hookWrapper = ::c10d::PythonOnCompletionHook(std::move(hook))](
+                                                  c10::intrusive_ptr<::c10d::Work> work) {
+                  hookWrapper(work);
+                });
+              },
+              // intentionally holding GIL as we move hook
+              py::arg("hook"),
+              py::call_guard<py::gil_scoped_acquire>())
+          .def(
+              "_wait_for_in_flight_works",
+              &::c10d::ProcessGroup::waitForInFlightWorks,
               py::call_guard<py::gil_scoped_release>());
 
   py::enum_<::c10d::ProcessGroup::BackendType>(processGroup, "BackendType")
@@ -2367,7 +2385,18 @@ Example::
                     3. For mixed CPU-GPU work (e.g. sending GPU tensors with GLOO), ``fut.done()`` returns
                        true when tensors have arrived on respective nodes, but not yet necessarily synched on
                        respective GPUs (similarly to GPU work).
-           )");
+           )")
+        .def(
+            "get_duration",
+            &::c10d::Work::getDuration,
+            py::call_guard<py::gil_scoped_release>(),
+            R"(
+              Returns:
+                  Duration of the corresponding collective communication.
+
+              .. warning ::
+                  This API only works for NCCL backend for now.
+            )");
 
   py::class_<c10::DDPLoggingData>(module, "DDPLoggingData")
       .def(py::init<>())

@@ -2454,6 +2454,45 @@ class DistributedDataParallelTest(
         process_group.broadcast([tensor]).wait()
 
 
+class WorkHookTest(MultiProcessTestCase):
+    def setUp(self):
+        super().setUp()
+        # NCCL_BLOCKING_WAIT overrides NCCL_ASYNC_ERROR_HANDLING hence tests
+        # that use NCCL_BLOCKING_WAIT will test it as expected.
+        os.environ["NCCL_ENABLE_TIMING"] = "1"
+        self._spawn_processes()
+
+    def tearDown(self):
+        super().tearDown()
+        try:
+            os.remove(self.file_name)
+        except OSError:
+            pass
+
+    def _get_store(self):
+        return dist.FileStore(self.file_name, self.world_size)
+
+    def _get_process_group(self):
+        store = self._get_store()
+        c10d.init_process_group("nccl", store=store, rank=self.rank, world_size=self.world_size)
+        return c10d.distributed_c10d._get_default_group()
+
+    @requires_nccl()
+    @skip_if_lt_x_gpu(2)
+    def test_on_completion_hook(self):
+        process_group = self._get_process_group()
+        print("==== before register")
+        def hook(work):
+            print("==== in hook!!!!! ", work.get_duration())
+        #process_group._register_on_completion_hook(lambda w: print("=== complete"))
+        process_group._register_on_completion_hook(hook)
+        print("==== after register")
+        tensor = torch.ones([2, 3]).cuda(self.rank)
+        process_group.broadcast([tensor]).wait()
+        process_group.broadcast([tensor]).wait()
+
+        c10d.destroy_process_group(process_group)
+
 
 class NcclErrorHandlingTest(MultiProcessTestCase):
     def setUp(self):
