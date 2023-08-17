@@ -998,6 +998,8 @@ def main():
     if RUN_BUILD_DEPS:
         build_deps()
 
+    # DOUG: Pretty sure we only need to worry about things up to this point, the rest is for building the wheel
+
     extensions, cmdclass, packages, entry_points, extra_install_requires = configure_extension_build()
 
     install_requires += extra_install_requires
