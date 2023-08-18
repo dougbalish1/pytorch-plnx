@@ -1,7 +1,7 @@
 # Check if the processor is an ARM and if Neon instruction are available on the machine where
 # the project is compiled.
 
-CPUINFO="processor	: 0
+set(CPUINFO "processor	: 0
 BogoMIPS	: 66.66
 Features	: fp asimd aes pmull sha1 sha2 crc32 cpuid
 CPU implementer	: 0x41
@@ -37,10 +37,9 @@ CPU variant	: 0x0
 CPU part	: 0xd03
 CPU revision	: 4
 
-"
+")
 
 IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
-   EXEC_PROGRAM(cat ARGS "/proc/cpuinfo" OUTPUT_VARIABLE CPUINFO)
 
    #neon instruction can be found on the majority part of modern ARM processor
    STRING(REGEX REPLACE "^.*(neon).*$" "\\1" NEON_THERE ${CPUINFO})
